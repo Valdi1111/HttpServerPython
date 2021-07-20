@@ -1,5 +1,6 @@
+from http.server import SimpleHTTPRequestHandler
+from socketserver import ThreadingTCPServer
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import base64
 import sys
 
@@ -8,7 +9,7 @@ db = {}
 
 hide_pages = [pw_file]
 skip_extensions = ['ico', 'css']
-skip_pages = ['', 'index.html', 'unauthorized.html']
+skip_pages = ['', 'index.html', 'index.htm', 'unauthorized.html']
 
 ip = '127.0.0.1'
 port = 10001
@@ -21,7 +22,7 @@ def censor_password(password):
     return censored
 
 
-class SimpleAuthHandler(SimpleHTTPRequestHandler):
+class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
     """ Main class to present webpages and authentication. """
 
     def do_HEAD(self):
@@ -41,7 +42,7 @@ class SimpleAuthHandler(SimpleHTTPRequestHandler):
             f = open('unauthorized.html', 'rb')
             super().copyfile(f, self.wfile)
         except OSError:
-            self.wfile.write(bytes('Not authenticated', 'utf-8'))
+            self.wfile.write(bytes('Not authenticated!', 'utf-8'))
         finally:
             f.close()
 
@@ -57,7 +58,7 @@ class SimpleAuthHandler(SimpleHTTPRequestHandler):
                 super().do_GET()
                 return
 
-        print('[+] Client is asking for webpage %s' % self.path)
+        print('[+] Client is asking for page %s' % self.path)
         for page in skip_pages:
             if self.path == '/' + page:
                 print('Returning the page without authentication...')
@@ -98,14 +99,19 @@ def main():
     except OSError:
         sys.exit('[!] Cloud not load passwords from %s' % pw_file)
 
+    address = (ip, port)
+    print('[!] Starting httpd at address %s port %d...' % address)
+    httpd = ThreadingTCPServer(address, AuthHTTPRequestHandler)
+    httpd.daemon_threads = False
+    httpd.allow_reuse_address = True
+
     try:
-        address = (ip, port)
-        print('[!] Starting httpd at address %s port %d...' % address)
-        httpd = ThreadingHTTPServer(address, SimpleAuthHandler)
-        httpd.serve_forever()
+        while True:
+            httpd.serve_forever()
     except KeyboardInterrupt:
         print('[!] Ctrl+C received, shutting down http server...')
-        httpd.socket.close()
+
+    httpd.server_close()
 
 
 if __name__ == '__main__':
