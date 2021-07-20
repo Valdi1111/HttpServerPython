@@ -7,7 +7,7 @@ import sys
 pw_file = 'password.txt'
 db = {}
 
-hide_pages = [pw_file]
+hide_pages = []
 skip_extensions = ['ico', 'css']
 skip_pages = ['', 'index.html', 'index.htm', 'unauthorized.html']
 
@@ -24,6 +24,8 @@ def censor_password(password):
 
 class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
     """ Main class to present webpages and authentication. """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory='website', **kwargs)
 
     def do_HEAD(self):
         self.send_response(200)
@@ -39,7 +41,7 @@ class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
     def do_UNAUTHORIZED(self):
         self.do_AUTHHEAD()
         try:
-            f = open('unauthorized.html', 'rb')
+            f = open('website/unauthorized.html', 'rb')
             super().copyfile(f, self.wfile)
         except OSError:
             self.wfile.write(bytes('Not authenticated!', 'utf-8'))
