@@ -1,8 +1,24 @@
+from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import base64
 import sys
+
+pw_file = 'password.txt'
 db = {}
 
+hide_pages = [pw_file]
+skip_extensions = ['ico', 'css']
+skip_pages = ['', 'index.html', 'unauthorized.html']
+
+ip = '127.0.0.1'
+port = 10001
+
+
+def censor_password(password):
+    censored = ''
+    for c in password:
+        censored += '*'
+    return censored
 
 
 class SimpleAuthHandler(SimpleHTTPRequestHandler):
@@ -19,51 +35,76 @@ class SimpleAuthHandler(SimpleHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
+    def do_UNAUTHORIZED(self):
+        self.do_AUTHHEAD()
+        try:
+            f = open('unauthorized.html', 'rb')
+            super().copyfile(f, self.wfile)
+        except OSError:
+            self.wfile.write(bytes('Not authenticated', 'utf-8'))
+        finally:
+            f.close()
+
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
-            super().do_GET()
+        """ Return the main page without authentication. """
+        for page in hide_pages:
+            if self.path == '/' + page:
+                self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                return
+
+        for extension in skip_extensions:
+            if self.path.endswith('.' + extension):
+                super().do_GET()
+                return
+
+        print('[+] Client is asking for webpage %s' % self.path)
+        for page in skip_pages:
+            if self.path == '/' + page:
+                print('Returning the page without authentication...')
+                super().do_GET()
+                return
+
         """ Present frontpage with user authentication. """
-        canEnter = False
-        for user in db:
-            key = base64.b64encode(bytes("%s:%s" % (user, db[user]), "utf-8")).decode("utf-8")
-            if self.headers['Authorization'] == 'Basic '+key:
-                canEnter = True
+        auth_header = self.headers['Authorization']
+        print('Receiving auth header: %s' % auth_header)
+        if auth_header is None:
+            print('Auth is none, asking for login...')
+            self.do_UNAUTHORIZED()
+            return
 
+        username, password = base64.b64decode(auth_header[6:]).decode('utf-8').split(':')
+        print('Decoded auth Credentials: %s - %s' % (username, censor_password(password)))
 
-
-        if canEnter:
+        if db.get(username) == password:
+            print('Auth is correct, returning the web page...')
             super().do_GET()
-        else:
-            self.do_AUTHHEAD()
-            f = None
-            try:
-                f = open("unauthorized.html", 'rb')
-            except OSError:
-                self.wfile.write(bytes('Not authenticated', 'utf-8'))
+            return
 
-            if f:
-                try:
-                    super().copyfile(f, self.wfile)
-                finally:
-                    f.close()
+        print('Auth is wrong, asking for login again...')
+        self.do_UNAUTHORIZED()
 
 
-def main():    
+def main():
+    global ip, port
+    if len(sys.argv) >= 3:
+        ip = sys.argv[1]
+        port = int(sys.argv[2])
+
     try:
-        with open("password.txt", 'r') as fp:
-            for line in fp:
-                auth = line.split()[:2]
-                db[auth[0]] = auth[1]
+        with open(pw_file, 'r') as f:
+            for line in f:
+                username, password = line.split()[:2]
+                db[username] = password
     except OSError:
-        sys.exit('File not loaded')
+        sys.exit('[!] Cloud not load passwords from %s' % pw_file)
+
     try:
-        ip = "192.168.1.42"
-        port = 10001
-        httpd = ThreadingHTTPServer((ip, port), SimpleAuthHandler)
-        print('started httpd...')
+        address = (ip, port)
+        print('[!] Starting httpd at address %s port %d...' % address)
+        httpd = ThreadingHTTPServer(address, SimpleAuthHandler)
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print(' received, shutting down server')
+        print('[!] Ctrl+C received, shutting down http server...')
         httpd.socket.close()
 
 
