@@ -4,6 +4,7 @@ from http import HTTPStatus
 import base64
 import sys
 
+website_path = 'website'
 pw_file = 'password.txt'
 db = {}
 
@@ -25,7 +26,7 @@ def censor_password(password):
 class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
     """ Main class to present webpages and authentication. """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory='website', **kwargs)
+        super().__init__(*args, directory=website_path, **kwargs)
 
     def do_HEAD(self):
         self.send_response(200)
@@ -87,6 +88,13 @@ class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.do_UNAUTHORIZED()
 
 
+class AuthHTTPServer(ThreadingTCPServer):
+    def __init__(self, address):
+        super().__init__(address, AuthHTTPRequestHandler)
+        self.daemon_threads = False
+        self.allow_reuse_address = True
+
+
 def main():
     global ip, port
     if len(sys.argv) >= 3:
@@ -103,17 +111,16 @@ def main():
 
     address = (ip, port)
     print('[!] Starting httpd at address %s port %d...' % address)
-    httpd = ThreadingTCPServer(address, AuthHTTPRequestHandler)
-    httpd.daemon_threads = False
-    httpd.allow_reuse_address = True
+    httpd = AuthHTTPServer(address)
+    print('[!] Server started!')
 
     try:
-        while True:
-            httpd.serve_forever()
+        httpd.serve_forever()
     except KeyboardInterrupt:
         print('[!] Ctrl+C received, shutting down http server...')
 
     httpd.server_close()
+    print('[!] Server closed! Goodbye :)')
 
 
 if __name__ == '__main__':
