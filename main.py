@@ -1,5 +1,8 @@
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import base64
+import sys
+db = {}
+
 
 
 class SimpleAuthHandler(SimpleHTTPRequestHandler):
@@ -17,12 +20,18 @@ class SimpleAuthHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self.path == "/" or self.path == "/index.html":
+            super().do_GET()
         """ Present frontpage with user authentication. """
-        username = "sos"
-        password = "sos"
-        key = base64.b64encode(bytes("%s:%s" % (username, password), "utf-8")).decode("utf-8")
+        canEnter = False
+        for user in db:
+            key = base64.b64encode(bytes("%s:%s" % (user, db[user]), "utf-8")).decode("utf-8")
+            if self.headers['Authorization'] == 'Basic '+key:
+                canEnter = True
 
-        if self.headers['Authorization'] == 'Basic '+key:
+
+
+        if canEnter:
             super().do_GET()
         else:
             self.do_AUTHHEAD()
@@ -39,15 +48,22 @@ class SimpleAuthHandler(SimpleHTTPRequestHandler):
                     f.close()
 
 
-def main():
+def main():    
     try:
-        ip = "127.0.0.1"
+        with open("password.txt", 'r') as fp:
+            for line in fp:
+                auth = line.split()[:2]
+                db[auth[0]] = auth[1]
+    except OSError:
+        sys.exit('File not loaded')
+    try:
+        ip = "192.168.1.42"
         port = 10001
         httpd = ThreadingHTTPServer((ip, port), SimpleAuthHandler)
         print('started httpd...')
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print('^C received, shutting down server')
+        print(' received, shutting down server')
         httpd.socket.close()
 
 
