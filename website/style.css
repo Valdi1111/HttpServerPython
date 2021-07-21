@@ -1,10 +1,22 @@
-p.p2 {
-    margin: 0.0px 0.0px 12.0px 0.0px;
-    font: 12.0px Times;
-    color: #000000;
-    -webkit-text-stroke: #000000
-}
 
-span.s1 {
-    font-kerning: none
+
+/* items*/
+
+.container {
+    
+    text-align: center;
+     
+}
+.container ul {
+  list-style: none;
+}
+.container ul li{
+  padding-top: 25px;
+  padding-bottom: 25px;
+  color: white;
+ 
+ 
+}
+.container ul li a{
+  text-decoration: none;
 }
