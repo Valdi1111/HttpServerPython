@@ -89,10 +89,11 @@ class AuthHTTPRequestHandler(SimpleHTTPRequestHandler):
 
 
 class AuthHTTPServer(ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
     def __init__(self, address):
         super().__init__(address, AuthHTTPRequestHandler)
-        self.daemon_threads = False
-        self.allow_reuse_address = True
 
 
 def main():
@@ -121,6 +122,7 @@ def main():
 
     httpd.server_close()
     print('[!] Server closed! Goodbye :)')
+    sys.exit(0)
 
 
 if __name__ == '__main__':
